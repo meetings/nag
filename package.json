@@ -1,0 +1,24 @@
+{
+  "name": "nag",
+  "version": "0.0.1",
+  "description": "Nagger",
+  "dependencies": {
+    "async": "~ 0.2",
+    "emailjs": "~ 0.3",
+    "twilio": "*"
+  },
+  "bin": "./nag.js",
+  "scripts": {
+    "test": "echo No tests specified"
+  },
+  "author": "Tuomas Starck <tuomas@meetin.gs>",
+  "license": "BSD",
+  "readmeFilename": "README.md",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/meetings/nag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/meetings/nag/issues"
+  }
+}
