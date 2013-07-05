@@ -5,7 +5,7 @@ nag
 [nag]: https://github.com/meetings/nag
 
 Simple tool to poll services and report errors
-(by email and sms) if service seems to be down.
+(by email and sms) if service is unreachable.
 
 
 Installation
@@ -29,7 +29,9 @@ file in */etc/nag.conf* with following properties:
  + parallel\_limit - The number of parallel poll requests.
 
  + mail\_sender - Alert mail from field.
+
  + mail\_recipients - A list of comma separated mail recipients.
+
  + mail\_server\_opts - A JSON object:
    * user - Login name.
    * password - Password.
@@ -38,4 +40,10 @@ file in */etc/nag.conf* with following properties:
 
  + sms\_recipients - A JSON array of phone numbers to send text message to.
 
- + TODO...
+
+TODO
+----
+
+ * Write decent readme
+
+ * Validate configuration
