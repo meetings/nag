@@ -2,16 +2,27 @@
 nag
 ===
 
+[nag]: https://github.com/meetings/nag
+
 Simple tool to poll services and report errors
 (by email and sms) if service seems to be down.
+
+
+Installation
+------------
+
+0. Clone from the [Github][nag].
+
+1. Install dependencies with *npm*.
+
+2. Set up configuration (see the next chapter).
 
 
 Configuration
 -------------
 
-Nag expects to find a properly formatted JSON configuration file in **/etc/nag.conf**.
-
-Configuration must have the following properties:
+Nag expects to find a properly formatted JSON configuration
+file in */etc/nag.conf* with following properties:
 
  + poll\_interval - The time to wait between polling services (in ms).
 

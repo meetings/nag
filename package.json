@@ -1,10 +1,11 @@
 {
   "name": "nag",
   "version": "0.0.1",
-  "description": "Nagger",
+  "description": "Nag tool",
   "dependencies": {
     "async": "~ 0.2",
     "emailjs": "~ 0.3",
+    "step": "*",
     "twilio": "*"
   },
   "bin": "./nag.js",

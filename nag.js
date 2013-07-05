@@ -5,7 +5,6 @@ var util     = require('util')
 var http     = require('http')
 var async    = require('async')
 var email    = require('emailjs')
-var twilio   = require('twilio')
 var urlparse = require('url').parse
 
 var CONF = {}
@@ -21,47 +20,48 @@ function init() {
 }
 
 function mainFlowControl() {
-    /*
-    var postProcess = function portProcess(err, results) {
-        var stats = examineResults(results)
-        cb(stats.ok, stats)
-    }
-    */
-
+    /* Query all the services.
+     */
     var roundOne = function roundOne(callback) {
         var postProcess = function postProcess(err, results) {
-            /// debug("RESULTS ARE HERE", results)
-            var stats = examineResults(results)
+            var stats = examineResults(results, CONF.short_limit)
+            /// if (stats.ok) util.log("All ok!")
             callback(stats.ok, stats)
         }
 
         checkAllServices(postProcess)
     }
 
+    /* Complain to console and requery services.
+     */
     var roundTwo = function roundTwo(stats, callback) {
         var postProcess = function postProcess(err, results) {
-            var stats = examineResults(results)
+            var stats = examineResults(results, CONF.long_limit)
             callback(stats.ok, stats)
         }
 
-        logFailedToStdout(stats.log_messages)
+        logToStdout(stats)
         checkAllServices(postProcess)
     }
 
+    /* Send email and query services yet again.
+     */
     var roundThree = function roundThree(stats, callback) {
         var postProcess = function postProcess(err, results) {
-            var stats = examineResults(results)
+            var stats = examineResults(results, CONF.patient_limit)
             callback(stats.ok, stats)
         }
 
-        logFailedToStdout(stats.log_messages)
+        logToStdout(stats)
         spamPeopleWithEmail(stats)
         checkAllServices(postProcess)
     }
 
+    /* Send text message and give up.
+     */
     var roundFour = function roundFour(stats, callback) {
-        logFailedToStdout(stats.log_messages)
-        makePhonesBeep(stats.text_message)
+        logToStdout(stats)
+        makePhonesBeep(stats)
         callback(null)
     }
 
@@ -71,10 +71,15 @@ function mainFlowControl() {
 }
 
 function loop() {
+    util.log("Waiting " + CONF.poll_interval + " ms")
+
     setTimeout(mainFlowControl, CONF.poll_interval)
 }
 
 function hup() {
+    /* FIXME Guard configration updating, so that
+     * it is not done in the middle of the run.
+     */
     util.log("Caught sighup, reading configuration")
 
     readConfig()
@@ -100,93 +105,32 @@ function checkAllServices(postProcess) {
     async.parallelLimit(joblist, CONF.parallel_limit, postProcess)
 }
 
-function examineResults(results) {
+function examineResults(results, threshold) {
     var stats = {
-        'ok': true,
-        'log_messages': [],
-        'email_message': 'Unable to connect to the following services:\n\n',
-        'text_message': 'ALERT:'
+        ok: true,
+        up: [],
+        slow: [],
+        down: []
     }
 
-    async.filter(results, selectFailed, function(failedServices) {
-        failedServices.forEach(function(service) {
-            /* Should be null on error, because
+    results.forEach(function(service) {
+        if (service.code != 200) {
+            /* Following should be null on error, because
              * only then async.waterfall flows down.
              */
             stats.ok = null
-
-            stats.log_messages.push(util.format(
-                'Service %s failed: %s (%s ms)', service.name,
-                CONF.http_codes[service.code], service.time
-            ))
-
-            stats.email_message += util.format(
-                '%s: %s (%s %s)\n',
-                service.name, service.url,
-                service.code, CONF.http_codes[service.code]
-            )
-
-            stats.text_message += ' ' + service.name
-        })
+            stats.down.push(service)
+        }
+        else if (service.time > threshold) {
+            stats.ok = null
+            stats.slow.push(service)
+        }
+        else {
+            stats.up.push(service)
+        }
     })
 
     return stats
-}
-
-function selectFailed(obj, callback) {
-    callback(typeof obj.code !== 'undefined' && obj.code != 200)
-}
-
-/* * * ADMINISTRATOR NOTIFICATION * * * */
-
-function logFailedToStdout(messages) {
-    messages.forEach(util.log)
-}
-
-function spamPeopleWithEmail(stats) {
-    var mail = {
-        text:    stats.email_message,
-        from:    CONF.mail_sender,
-        to:      CONF.mail_recipients,
-        subject: stats.text_message
-    }
-
-    var errHandler = function errHandler(err) {
-        if (err) util.log("Unable to send email, please check mail server options")
-    }
-
-    var connection = email.server.connect(CONF.mail_server_opts)
-
-    connection.send(mail, errHandler)
-
-    util.log("Mail sent to: " + mail.to)
-}
-
-function makePhonesBeep(message) {
-    if (!CONF.sms_recipients instanceof Array) {
-        util.log("Unable to send sms, please check configuration")
-    }
-
-    // var twilioclient = new twilio.RestClient(CONF.twilio_account_sid, CONF.twilio_auth_token)
-
-    CONF.sms_recipients.forEach(function(number) {
-        var sms = {
-            to:   number,
-            from: CONF.twilio_from_nro,
-            body: message
-        }
-
-        var callback = function(err, msg) {
-            if (err) util.log("Sending text message failed")
-            else { /// FIXME debug
-                debug("TWILIO ONNISTUI", msg)
-            }
-        }
-
-        // twilioclient.sms.messages.create(sms, callback)
-
-        util.log("SMS sent to: " + sms.to)
-    })
 }
 
 /* * * SENDING HTTP REQUESTS  * * * * * */
@@ -205,7 +149,9 @@ var httpRequest = function httpRequest(service, callback) {
     var atStart = new Date().getTime()
 
     var request = http.request(opt, function(response) {
-        util.log("Got responce from " + service.name)
+        // http://goo.gl/UYHB6
+        response.on('data', function(d){})
+
         callback(null, {
             name: service.name,
             code: response.statusCode,
@@ -216,7 +162,6 @@ var httpRequest = function httpRequest(service, callback) {
     })
 
     request.on('error', function() {
-        util.log("Unreachable service: " + url.href)
         callback(null, {
             code: 600,
             name: service.name,
@@ -226,6 +171,104 @@ var httpRequest = function httpRequest(service, callback) {
     })
 
     request.end()
+}
+
+/* * * ADMINISTRATOR NOTIFICATION * * * */
+
+function logToStdout(stats) {
+    stats.slow.forEach(function(service) {
+        util.log(util.format(
+            'Service %s was slow (%s ms)',
+            service.name, service.time
+        ))
+    })
+
+    stats.down.forEach(function(service) {
+        util.log(util.format(
+            'Service %s failed (%s): %s',
+            service.name, service.code, service.url
+        ))
+    })
+}
+
+function spamPeopleWithEmail(stats) {
+    var message = ''
+    var title = 'ALERT:' + getServiceNames(stats.slow) + getServiceNames(stats.down)
+
+    if (stats.slow.length > 0) {
+        message += '\nSLOW:\n\n'
+
+        stats.slow.forEach(function(service) {
+            message += util.format(
+                '%s (%s ms)',
+                service.name, service.time
+            )
+        })
+    }
+
+    if (stats.down.length > 0) {
+        message += '\n\nDOWN:\n\n'
+
+        stats.down.forEach(function(service) {
+            message += util.format(
+                '%s (%s): %s',
+                service.name, service.code, service.url
+            )
+        })
+    }
+
+    var mail = {
+        text:    message,
+        from:    CONF.mail_sender,
+        to:      CONF.mail_recipients,
+        subject: title
+    }
+
+    var errHandler = function errHandler(err) {
+        if (err) util.log("Unable to send email, please check mail server options")
+    }
+
+    var connection = email.server.connect(CONF.mail_server_opts)
+
+    connection.send(mail, errHandler)
+
+    util.log("Mail sent to: " + mail.to)
+}
+
+function makePhonesBeep(stats) {
+    if (stats.down.length <= 0) return
+
+    if (!CONF.sms_recipients instanceof Array) {
+        util.log("Unable to send sms, please check configuration")
+    }
+
+    var twilio = require('twilio')
+    var twilioclient = new twilio.RestClient(CONF.twilio_account_sid, CONF.twilio_auth_token)
+
+    CONF.sms_recipients.forEach(function(number) {
+        var sms = {
+            to:   number,
+            from: CONF.twilio_from_nro,
+            body: 'ALERT:' + getServiceNames(stats.down)
+        }
+
+        var callback = function(err, msg) {
+            if (err) util.log("Sending text message failed")
+            else { /// FIXME debug
+                debug("TWILIO ONNISTUI", msg)
+            }
+        }
+
+        twilioclient.sms.messages.create(sms, callback)
+
+        util.log("SMS sent to: " + sms.to)
+    })
+}
+
+function getServiceNames(arr) {
+    var str = ''
+    arr.forEach(function(val) { str += ' ' + val.name })
+    return str
 }
 
 /* * * CONFIGURATION HANDLING * * * * * */
@@ -247,7 +290,7 @@ function readConfig() {
         process.exit(1)
     }
 
-    //// FIXME: Validate configuration somehow.
+    /// FIXME Validate configuration somehow \\\
 }
 
 /* * * DEBUG  * * * * * * * * * * * * * */
