@@ -48,65 +48,52 @@ function readConfig() {
 
 function serviceCheckThread(service) {
     step(
-        function initialQuery() {
-            queryService(service, CONF.short_timeout, this)
+        function queryTheService() {
+            var                     queryTimeout = CONF.short_timeout
+            if (service.fails >= 1) queryTimeout = CONF.long_timeout
+            if (service.fails >= 2) queryTimeout = CONF.patient_timeout
+
+            queryService(service, queryTimeout, this)
         },
 
-        function initialResultCheck(err, result) {
+        function lookForErrorsInResults(err, result) {
             checkForFailure(result, this)
         },
 
-        function logIfErrorsAndQueryAgain(err, result) {
-            if (err == null) this(err, result)
+        function actIfThereWereErrors(err, result) {
+            var nextTimeout = 0
 
-            debug("AFTER FIRST CHECK", result)
+            if (result.fails === undefined) result.fails = 0
 
-            logStatus(result)
+            if (err) {
+                result.fails += 1
+                nextTimeout = CONF.poll_quick_repeat
 
-            var context = this
+                logFailure(result)
 
-            setTimeout(function() {
-                queryService(result, CONF.long_timeout, context)
-            }, CONF.poll_repeat_delay)
-        },
+                if (result.fails > 1) {
+                    spamPeopleWithEmail(result)
+                }
 
-        function checkResultsAgain(err, result) {
-            checkForFailure(result, this)
-        },
+                if (result.fails > 2) {
+                    makePhonesBeep(result)
+                    nextTimeout = CONF.poll_normal_interval
+                }
+            }
+            else {
+                if (result.fails != 0) logGood(result)
 
-        function sendEmailIfErrorsAndQueryYetAgain(err, result) {
-            if (err == null) this(err, result)
+                result.fails = 0
+                nextTimeout = CONF.poll_normal_interval
+            }
 
-            logStatus(result)
-            spamPeopleWithEmail(result)
-
-            var context = this
-
-            setTimeout(function() {
-                queryService(result, CONF.patient_timeout, context)
-            }, CONF.poll_repeat_delay)
-        },
-
-        function checkErrorsForTheLastTime(err, result) {
-            checkForFailure(result, this)
-        },
-
-        function sendTextMessageIfErrorsAndLoop(err, result) {
-            if (err == null) this(err, result)
-
-            logStatus(result)
-            makePhonesBeep(result)
-
-            setTimeout(function() {
-                serviceCheckThread(result)
-            }, CONF.poll_interval)
+            setTimeout(function() { serviceCheckThread(result) }, nextTimeout)
         }
     )
 }
 
 function checkForFailure(result, callback) {
     if (result.code != 200) {
-        debug("VIRHE TULOKSESSA", result)
         callback(true, result)
     }
 
@@ -133,18 +120,20 @@ function queryService(service, timeout, callback) {
     request(query, function(error, response, body) {
         if (error) {
             callback(null, {
-                name: service.name,
-                code: error.code,
-                time: 0,
-                url:  service.url
+                name:  service.name,
+                code:  error.code,
+                time:  0,
+                url:   service.url,
+                fails: service.fails
             })
         }
         else {
             callback(null, {
-                name: service.name,
-                code: response.statusCode,
-                time: (new Date().getTime() - atStart),
-                url:  service.url
+                name:  service.name,
+                code:  response.statusCode,
+                time:  (new Date().getTime() - atStart),
+                url:   service.url,
+                fails: service.fails
             })
         }
     })
@@ -152,10 +141,17 @@ function queryService(service, timeout, callback) {
 
 /* * * ADMINISTRATOR NOTIFICATION * * * */
 
-function logStatus(service) {
+function logGood(service) {
     util.log(util.format(
-        'Slow service: %s (%s ms)',
+        'Service is good: %s (%s ms)',
         service.name, service.time
+    ))
+}
+
+function logFailure(service) {
+    util.log(util.format(
+        'Service failed: %s (%s) in %s ms',
+        service.name, service.code, service.time
     ))
 }
 
@@ -209,12 +205,12 @@ function makePhonesBeep(service) {
 
         var callback = function(err, msg) {
             if (err) util.log("Sending text message failed")
-            else { /// FIXME debug
+            else { /// FIXME DEBUG
                 debug("TWILIO ONNISTUI", msg)
             }
         }
 
-        /// FIXME debug twilioclient.sms.messages.create(sms, callback)
+        twilioclient.sms.messages.create(sms, callback)
 
         util.log("SMS sent to: " + sms.to)
     })
@@ -228,7 +224,7 @@ init()
 
 function debug(msg, obj) {
     console.log("DEBUG :: " + msg + " ::")
-    console.log(util.inspect(obj, {showHidden: true, depth: 1, colors: true}))
+    console.log(util.inspect(obj, {showHidden: true, depth: 0, colors: true}))
 }
 
 process.on('uncaughtException', function(err) {
