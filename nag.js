@@ -6,11 +6,12 @@ var step     = require('step')
 var email    = require('emailjs')
 var request  = require('request')
 var urlparse = require('url').parse
+var hostname = require('os').hostname()
 
 var CONF = {}
 var CONFIG_FILE = '/etc/nag.conf'
 
-/* * * INIT * * * * * * * * * * * * * * */
+/* * * INIT AND QUIT  * * * * * * * * * */
 
 function init() {
     util.log("Initializing service threads")
@@ -24,6 +25,12 @@ function init() {
     })
 }
 
+function exit() {
+    util.log("Caught sigint, exiting")
+
+    process.exit(0)
+}
+
 /* * * READING CONFIGURATION  * * * * * */
 
 function readConfig() {
@@ -34,12 +41,14 @@ function readConfig() {
         util.log("Configuration read successfully")
     }
     catch (err) {
-        util.log("Failed to parse configuration!")
+        util.log("--")
+        util.log("Failed to parse configuration")
         util.log("--")
         util.log("Configuration must be valid json data and")
         util.log("config file is expected to be found at")
-        util.log(CONFIG_FILE + ".")
+        util.log(CONFIG_FILE)
         util.log("--")
+        util.log("Quitting")
         process.exit(1)
     }
 }
@@ -67,7 +76,7 @@ function serviceCheckThread(service) {
 
             if (err) {
                 result.fails += 1
-                nextTimeout = CONF.poll_quick_repeat
+                nextTimeout = CONF.poll_fail_repeat
 
                 logFailure(result)
 
@@ -81,7 +90,7 @@ function serviceCheckThread(service) {
                 }
             }
             else {
-                if (result.fails != 0) logGood(result)
+                logGood(result)
 
                 result.fails = 0
                 nextTimeout = CONF.poll_normal_interval
@@ -98,12 +107,6 @@ function checkForFailure(result, callback) {
     }
 
     callback(null, result)
-}
-
-function exit() {
-    util.log("Caught sigint, exiting")
-
-    process.exit(0)
 }
 
 /* * * SENDING HTTP REQUESTS  * * * * * */
@@ -167,8 +170,8 @@ be queried at the following address:\n\
 \n\
 %s\n\
 \n\
-With regards,\n\
-your faithful nag tool\n", service.name, service.code, service.url)
+Yours faithfully,\n\
+Nag process at %s\n", service.name, service.code, service.url, hostname)
 
     var mail = {
         from:    CONF.mail_sender,
@@ -191,43 +194,33 @@ your faithful nag tool\n", service.name, service.code, service.url)
 function makePhonesBeep(service) {
     if (!CONF.sms_recipients instanceof Array) {
         util.log("Unable to send sms, please check configuration")
+        return
     }
 
     var twilio = require('twilio')
     var twilioclient = new twilio.RestClient(CONF.twilio_account_sid, CONF.twilio_auth_token)
 
+    var message = util.format(
+        'ALERT (%s): %s [%s]',
+        hostname, service.name, service.code
+    )
+
     CONF.sms_recipients.forEach(function(number) {
         var sms = {
             to:   number,
             from: CONF.twilio_from_nro,
-            body: 'ALERT: ' + service.name
+            body: message
         }
 
         var callback = function(err, msg) {
             if (err) util.log("Sending text message failed")
-            else { /// FIXME DEBUG
-                debug("TWILIO ONNISTUI", msg)
-            }
+            else     util.log("SMS sent to: " + sms.to)
         }
 
         twilioclient.sms.messages.create(sms, callback)
-
-        util.log("SMS sent to: " + sms.to)
     })
 }
 
 process.on('SIGINT', exit)
 
 init()
-
-/* * * DEBUG  * * * * * * * * * * * * * */
-
-function debug(msg, obj) {
-    console.log("DEBUG :: " + msg + " ::")
-    console.log(util.inspect(obj, {showHidden: true, depth: 0, colors: true}))
-}
-
-process.on('uncaughtException', function(err) {
-    debug("UNCAUGHTEXCEPTION", err)
-    process.exit(1)
-})

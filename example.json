@@ -1,0 +1,44 @@
+{
+
+"README": [
+    "This configuration MUST be valid JSON data.",
+    "--",
+    "Following values are expected to be found",
+    "when this configuration is read. Any missing",
+    "on invalid value may lead to undocumented",
+    "behaviour.",
+    "",
+    "All <time> values are in milliseconds."
+],
+
+"poll_normal_interval": "<time>",
+"poll_fail_repeat":     "<time>",
+
+"short_timeout":   "<time>",
+"long_timeout":    "<time>",
+"patient_timeout": "<time>",
+
+"mail_sender":     "email@address.tld",
+"mail_recipients": "comma separated list of email addresses",
+
+"sms_recipients": [
+    "JSON list of phone numbers"
+],
+
+"mail_server_opts": {
+    "user":     "",
+    "password": "",
+    "host":     "",
+    "ssl":      ""
+},
+
+"twilio_from_nro":    "",
+"twilio_account_sid": "",
+"twilio_auth_token":  "",
+
+"target_services": [
+    { "name": "a_service",       "url": "http://url.to/check" },
+    { "name": "another_service", "url": "https://another.url.to/check" }
+]
+
+}
