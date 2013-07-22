@@ -8,8 +8,8 @@ var request  = require('request')
 var urlparse = require('url').parse
 var hostname = require('os').hostname()
 
-var CONF = {}
-var CONFIG_FILE = '/etc/nag.conf'
+var CONF      = {}
+var CONF_FILE = '/etc/nag.conf'
 
 /* * * INIT AND QUIT  * * * * * * * * * */
 
@@ -21,7 +21,7 @@ function init() {
     CONF.target_services.forEach(function(service) {
         setTimeout(function() {
             serviceCheckThread(service)
-        }, 1000)
+        }, randomInt(1000, 2000))
     })
 }
 
@@ -31,10 +31,14 @@ function exit() {
     process.exit(0)
 }
 
+function randomInt(min, max) {
+    return Math.round(Math.random() * (max - min) + min)
+}
+
 /* * * READING CONFIGURATION  * * * * * */
 
 function readConfig() {
-    var file = fs.readFileSync(CONFIG_FILE, {encoding: 'utf8'})
+    var file = fs.readFileSync(CONF_FILE, {encoding: 'utf8'})
 
     try {
         CONF = JSON.parse(file)
@@ -46,7 +50,7 @@ function readConfig() {
         util.log("--")
         util.log("Configuration must be valid json data and")
         util.log("config file is expected to be found at")
-        util.log(CONFIG_FILE)
+        util.log(CONF_FILE)
         util.log("--")
         util.log("Quitting")
         process.exit(1)
@@ -165,8 +169,8 @@ function spamPeopleWithEmail(service) {
 "Dear reader,\n\
 \n\
 It should come to Your attention, that the service called %s has some\n\
-issues. More specifically, error code %s was reported. The service may\n\
-be queried at the following address:\n\
+issues. More specifically, error code %s was reported. The\n\
+service may be queried at the following address:\n\
 \n\
 %s\n\
 \n\
