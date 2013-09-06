@@ -4,6 +4,7 @@
   "description": "Nag tool",
   "dependencies": {
     "emailjs": "~ 0.3",
+    "geckoboard-push": "~ 0.0.5",
     "request": "~ 2",
     "step": "*",
     "twilio": "*"

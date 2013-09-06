@@ -1,12 +1,13 @@
 #!/usr/bin/env nodejs
 
-var fs       = require('fs')
-var util     = require('util')
-var step     = require('step')
-var email    = require('emailjs')
-var request  = require('request')
-var urlparse = require('url').parse
-var hostname = require('os').hostname()
+var fs         = require('fs')
+var util       = require('util')
+var step       = require('step')
+var email      = require('emailjs')
+var request    = require('request')
+var urlparse   = require('url').parse
+var hostname   = require('os').hostname()
+var gecko      = require('./gecko')
 
 var CONF      = {}
 var CONF_FILE = '/etc/nag.conf'
@@ -23,6 +24,8 @@ function init() {
             serviceCheckThread(service)
         }, randomInt(1000, 2000))
     })
+
+    gecko.init()
 }
 
 function exit() {
@@ -224,6 +227,8 @@ function makePhonesBeep(service) {
         twilioclient.sms.messages.create(sms, callback)
     })
 }
+
+/* * * INIT * * * * * * * * * * * * * * */
 
 process.on('SIGINT', exit)
 

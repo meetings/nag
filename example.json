@@ -14,9 +14,11 @@
 "poll_normal_interval": "<time>",
 "poll_fail_repeat":     "<time>",
 
-"short_timeout":   "<time>",
-"long_timeout":    "<time>",
-"patient_timeout": "<time>",
+"short_timeout":        "<time>",
+"long_timeout":         "<time>",
+"patient_timeout":      "<time>",
+
+"geckoboard_interval":  "<time>",
 
 "mail_sender":     "email@address.tld",
 "mail_recipients": "comma separated list of email addresses",
@@ -35,6 +37,9 @@
 "twilio_from_nro":    "",
 "twilio_account_sid": "",
 "twilio_auth_token":  "",
+
+"geckoboard_api_key":    "",
+"geckoboard_widget_key": "",
 
 "target_services": [
     { "name": "a_service",       "url": "http://url.to/check" },
