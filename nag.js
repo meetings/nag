@@ -62,7 +62,7 @@ function readConfig() {
 function serviceCheckThread(service) {
     step(
         function queryTheService() {
-            var                     queryTimeout = CONF.short_timeout
+            var                     queryTimeout = service.short_timeout || CONF.short_timeout
             if (service.fails >= 1) queryTimeout = CONF.long_timeout
             if (service.fails >= 2) queryTimeout = CONF.patient_timeout
 
