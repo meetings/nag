@@ -98,7 +98,7 @@ function serviceCheckThread(service) {
                 sendServiceFailureReports( service );
 
                 if (service.fails > 2) {
-                    nextWaitTime = CONF.poll_normal_interval;
+                    nextWaitTime = service.fails * CONF.poll_normal_interval;
                 }
                 else {
                     nextWaitTime = CONF.poll_fail_repeat;
