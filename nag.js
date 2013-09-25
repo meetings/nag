@@ -2,7 +2,7 @@
 
 var fs       = require('fs')
 var util     = require('util')
-var step     = require('step')
+var async    = require('async')
 var email    = require('emailjs')
 var request  = require('request')
 var urlparse = require('url').parse
@@ -20,6 +20,7 @@ function init() {
 
     CONF.target_services.forEach(function(service) {
         setTimeout(function() {
+            service.fails = 0;
             serviceCheckThread(service)
         }, randomInt(1000, 2000))
     })
@@ -60,76 +61,82 @@ function readConfig() {
 /* * * MAIN CONTROL * * * * * * * * * * */
 
 function serviceCheckThread(service) {
-    step(
-        function queryTheService() {
-            var                     queryTimeout = service.short_timeout || CONF.short_timeout
-            if (service.fails >= 1) queryTimeout = CONF.long_timeout
-            if (service.fails >= 2) queryTimeout = CONF.patient_timeout
+    async.waterfall([
 
-            queryService(service, queryTimeout, this)
+        function sendServiceResponse( cb ){
+            var ping_request_timeout = determineRequestTimeoutFromFailures( service );
+
+            var request_configuration = {
+                uri:     service.url,
+                timeout: ping_request_timeout,
+                headers: { 'Connection': 'close' }
+            }
+
+            var start_time = new Date().getTime();
+
+            request( request_configuration, function requestResponseHandler( error, response, body ) {
+                return cb( null, start_time, error, response, body );
+            });
         },
 
-        function lookForErrorsInResults(err, result) {
-            checkForFailure(result, this)
-        },
+        function handleServiceResponse( start_time, error, response, body, cb ) {
+            service.last_duration = new Date().getTime() - start_time;
+            service.last_code = error ? error.code : response.statusCode;
 
-        function actIfThereWereErrors(err, result) {
-            var nextTimeout = 0
+            var nextWaitTime = CONF.poll_normal_interval;
 
-            if (result.fails === undefined) result.fails = 0
+            if ( service.last_code == 200 ) {
+                logGood( service );
 
-            if (err) {
-                result.fails += 1
-                nextTimeout = CONF.poll_fail_repeat
-
-                logFailure(result)
-
-                if (result.fails > 1) {
-                    spamPeopleWithEmail(result)
-                }
-
-                if (result.fails > 2) {
-                    makePhonesBeep(result)
-                    nextTimeout = CONF.poll_normal_interval
-                }
+                service.fails = 0;
             }
             else {
-                logGood(result)
+                service.fails += 1;
 
-                result.fails = 0
-                nextTimeout = CONF.poll_normal_interval
+                logFailure( service );
+
+                sendServiceFailureReports( service );
+
+                if (service.fails > 2) {
+                    nextWaitTime = CONF.poll_normal_interval;
+                }
+                else {
+                    nextWaitTime = CONF.poll_fail_repeat;
+                }
             }
 
-            setTimeout(function() { serviceCheckThread(result) }, nextTimeout)
+            return cb( null, nextWaitTime );
         }
-    )
+
+    ], function scheduleNextRun( err, next_wait_time ) {
+        if ( err ) {
+            util.log( "Error while processing service " + service.name + ": " + err );
+            next_wait_time = CONF.poll_normal_interval;
+        }
+
+        setTimeout(function() { serviceCheckThread(service) }, next_wait_time );
+    } );
 }
 
-function checkForFailure(result, callback) {
-    if (result.code != 200) {
-        callback(true, result)
+function determineRequestTimeoutFromFailures( service ) {
+    var queryTimeout = service.short_timeout || CONF.short_timeout
+    if (service.fails >= 1) queryTimeout = CONF.long_timeout
+    if (service.fails >= 2) queryTimeout = CONF.patient_timeout
+
+    return queryTimeout;
+}
+
+
+function sendServiceFailureReports( service ) {
+    if (service.fails > 1) {
+        spamPeopleWithEmail(service);
     }
 
-    callback(null, result)
-}
-
-/* * * SENDING HTTP REQUESTS  * * * * * */
-
-function queryService(service, timeout, callback) {
-    var atStart = new Date().getTime()
-
-    var query = {
-        uri:     service.url,
-        timeout: timeout,
-        headers: { 'Connection': 'close' }
+    if (service.fails > 2) {
+        makePhonesBeep(service);
     }
-
-    request(query, function(error, response, body) {
-        service.last_duration = new Date().getTime() - atStart;
-        service.code = error ? error.code : response.statusCode;
-        callback( null, service );
-    })
 }
+
 
 /* * * ADMINISTRATOR NOTIFICATION * * * */
 
@@ -143,7 +150,7 @@ function logGood(service) {
 function logFailure(service) {
     util.log(util.format(
         'Service failed: %s (%s) in %s ms',
-        service.name, service.code, service.last_duration
+        service.name, service.last_code, service.last_duration
     ))
 }
 
@@ -160,7 +167,7 @@ service may be queried at the following address:\n\
 %s\n\
 \n\
 Yours faithfully,\n\
-Nag process at %s\n", service.name, service.code, service.url, hostname)
+Nag process at %s\n", service.name, service.last_code, service.url, hostname)
 
     var mail = {
         from:    CONF.mail_sender,
@@ -191,7 +198,7 @@ function makePhonesBeep(service) {
 
     var message = util.format(
         'ALERT (%s): %s [%s]',
-        hostname, service.name, service.code
+        hostname, service.name, service.last_code
     )
 
     CONF.sms_recipients.forEach(function(number) {

@@ -5,7 +5,7 @@
   "dependencies": {
     "emailjs": "~ 0.3",
     "request": "~ 2",
-    "step": "*",
+    "async": "0.2.9",
     "twilio": "*"
   },
   "bin": "./nag.js",
