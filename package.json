@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "description": "Nag tool",
   "dependencies": {
-    "emailjs": "~ 0.3",
-    "request": "~ 2",
+    "emailjs": "0.3.5",
+    "request": "2.27.0",
     "async": "0.2.9",
-    "twilio": "*"
+    "twilio": "1.2.0"
   },
   "bin": "./nag.js",
   "scripts": {
