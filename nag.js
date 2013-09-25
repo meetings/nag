@@ -125,24 +125,9 @@ function queryService(service, timeout, callback) {
     }
 
     request(query, function(error, response, body) {
-        if (error) {
-            callback(null, {
-                name:  service.name,
-                code:  error.code,
-                time:  0,
-                url:   service.url,
-                fails: service.fails
-            })
-        }
-        else {
-            callback(null, {
-                name:  service.name,
-                code:  response.statusCode,
-                time:  (new Date().getTime() - atStart),
-                url:   service.url,
-                fails: service.fails
-            })
-        }
+        service.last_duration = new Date().getTime() - atStart;
+        service.code = error ? error.code : response.statusCode;
+        callback( null, service );
     })
 }
 
@@ -151,14 +136,14 @@ function queryService(service, timeout, callback) {
 function logGood(service) {
     util.log(util.format(
         'Service is good: %s (%s ms)',
-        service.name, service.time
+        service.name, service.last_duration
     ))
 }
 
 function logFailure(service) {
     util.log(util.format(
         'Service failed: %s (%s) in %s ms',
-        service.name, service.code, service.time
+        service.name, service.code, service.last_duration
     ))
 }
 
