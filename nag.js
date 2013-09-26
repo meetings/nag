@@ -101,7 +101,7 @@ function serviceCheckThread(service) {
                     nextWaitTime = service.fails * CONF.poll_normal_interval;
                 }
                 else {
-                    nextWaitTime = CONF.poll_fail_repeat;
+                    nextWaitTime = CONF.poll_fail_repeat_delay;
                 }
             }
 

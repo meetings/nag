@@ -11,8 +11,8 @@
     "All <time> values are in milliseconds."
 ],
 
-"poll_normal_interval": "<time>",
-"poll_fail_repeat":     "<time>",
+"poll_normal_interval":   "<time>",
+"poll_fail_repeat_delay": "<time>",
 
 "short_timeout":   "<time>",
 "long_timeout":    "<time>",
