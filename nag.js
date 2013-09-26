@@ -120,8 +120,8 @@ function serviceCheckThread(service) {
 
 function determineRequestTimeoutFromFailures( service ) {
     var queryTimeout = service.short_timeout || CONF.short_timeout
-    if (service.fails >= 1) queryTimeout = CONF.long_timeout
-    if (service.fails >= 2) queryTimeout = CONF.patient_timeout
+    if (service.fails >= 1) queryTimeout = service.long_timeout || CONF.long_timeout
+    if (service.fails >= 2) queryTimeout = service.patient_timeout || CONF.patient_timeout
 
     return queryTimeout;
 }
