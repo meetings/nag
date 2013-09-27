@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Nag tool",
   "dependencies": {
-    "emailjs": "0.3.5",
+    "emailjs": "0.3.4",
     "request": "2.27.0",
     "async": "0.2.9",
     "twilio": "1.2.0"
