@@ -68,14 +68,28 @@ function serviceCheckThread(service) {
 
             var request_configuration = {
                 uri:     service.url,
-                timeout: ping_request_timeout,
+                timeout: 30000, // TODO - make this configurable from conf file
                 headers: { 'Connection': 'close' }
             }
 
             var start_time = new Date().getTime();
+            var check_handled = false;
+
+            setTimeout( function(){
+                if ( !check_handled ) {
+                    check_handled = true;
+                    return cb( null, start_time, { code: 'NAG_TIMEOUT' }, false, false );
+                }
+            }, ping_request_timeout );
 
             request( request_configuration, function requestResponseHandler( error, response, body ) {
-                return cb( null, start_time, error, response, body );
+                if ( !check_handled ) {
+                    check_handled = true;
+                    return cb( null, start_time, error, response, body );
+                }
+                else {
+                    logTimeout( service, start_time, error, response, body );
+                }
             });
         },
 
@@ -141,16 +155,34 @@ function sendServiceFailureReports( service ) {
 /* * * ADMINISTRATOR NOTIFICATION * * * */
 
 function logGood(service) {
-    util.log(util.format(
-        'Service is good: %s (%s ms)',
-        service.name, service.last_duration
-    ))
+    if ( service.fails > 0 ) {
+        util.log(util.format(
+            'Service is good after fail #%s: %s (%s ms)',
+            service.fails, service.name, service.last_duration
+        ))
+    }
+    else {
+        util.log(util.format(
+            'Service is good: %s (%s ms)',
+            service.name, service.last_duration
+        ))
+    }
 }
 
 function logFailure(service) {
     util.log(util.format(
-        'Service failed: %s (%s) in %s ms',
-        service.name, service.last_code, service.last_duration
+        'Service failed: %s (%s) in %s ms - #%s',
+        service.name, service.last_code, service.last_duration, service.fails
+    ))
+}
+
+function logTimeout(service, start_time, error, response, body ) {
+    var last_duration = new Date().getTime() - start_time;
+    var returned = error ? error.code : response.statusCode;
+
+    util.log(util.format(
+        'Timed out service returned: %s (%s) in %s ms',
+        service.name, returned, last_duration
     ))
 }
 
