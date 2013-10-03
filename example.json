@@ -2,16 +2,17 @@
 
 "README": [
     "This configuration MUST be valid JSON data.",
-    "--",
-    "Following values are expected to be found",
-    "when this configuration is read. Any missing",
-    "on invalid value may lead to undocumented",
-    "behaviour.",
+    "",
+    "Unless stated otherwise, all configuration attributes",
+    "are expected to be found and have reasonable values.",
+    "",
+    "In target_services, values for name and url are",
+    "required. Others are optional.",
     "",
     "All <time> values are in milliseconds."
 ],
 
-"poll_normal_interval":   "<time>",
+"poll_default_interval":  "<time>",
 "poll_fail_repeat_delay": "<time>",
 
 "short_timeout":   "<time>",
@@ -21,10 +22,6 @@
 "mail_sender":     "email@address.tld",
 "mail_recipients": "comma separated list of email addresses",
 
-"sms_recipients": [
-    "JSON list of phone numbers"
-],
-
 "mail_server_opts": {
     "user":     "",
     "password": "",
@@ -32,13 +29,21 @@
     "ssl":      ""
 },
 
+"sms_recipients": [
+    "An array of phone numbers.",
+    "",
+    "If text messages are not wanted, leave this",
+    "array empty or undefined. Then you may also",
+    "leave out twilio_* attributes."
+],
+
 "twilio_from_nro":    "",
 "twilio_account_sid": "",
 "twilio_auth_token":  "",
 
 "target_services": [
     { "name": "a_service",       "url": "http://url.to/check" },
-    { "name": "another_service", "url": "https://another.url.to/check" }
+    { "name": "another_service", "url": "https://another.url.to/check", "interval": "<time>" }
 ]
 
 }

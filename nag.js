@@ -5,7 +5,6 @@ var util     = require('util')
 var async    = require('async')
 var email    = require('emailjs')
 var request  = require('request')
-var urlparse = require('url').parse
 var hostname = require('os').hostname()
 
 var CONF      = {}
@@ -63,8 +62,8 @@ function readConfig() {
 function serviceCheckThread(service) {
     async.waterfall([
 
-        function sendServiceResponse( cb ){
-            var ping_request_timeout = determineRequestTimeoutFromFailures( service );
+        function sendServiceResponse(callback) {
+            var ping_request_timeout = determineRequestTimeoutFromFailures(service);
 
             var request_configuration = {
                 uri:     service.url,
@@ -75,73 +74,74 @@ function serviceCheckThread(service) {
             var start_time = new Date().getTime();
             var check_handled = false;
 
-            setTimeout( function(){
-                if ( !check_handled ) {
+            setTimeout(function() {
+                if (!check_handled) {
                     check_handled = true;
-                    return cb( null, start_time, { code: 'NAG_TIMEOUT' }, false, false );
+                    return callback(null, start_time, { code: 'NAG_TIMEOUT' }, false, false);
                 }
-            }, ping_request_timeout );
+            }, ping_request_timeout);
 
-            request( request_configuration, function requestResponseHandler( error, response, body ) {
-                if ( !check_handled ) {
+            request(request_configuration, function requestResponseHandler(error, response, body) {
+                if (!check_handled) {
                     check_handled = true;
-                    return cb( null, start_time, error, response, body );
+                    return callback(null, start_time, error, response, body);
                 }
                 else {
-                    logTimeout( service, start_time, error, response, body );
+                    logTimeout(service, start_time, error, response);
                 }
             });
         },
 
-        function handleServiceResponse( start_time, error, response, body, cb ) {
+        function handleServiceResponse(start_time, error, response, body, callback) {
             service.last_duration = new Date().getTime() - start_time;
             service.last_code = error ? error.code : response.statusCode;
 
-            var nextWaitTime = CONF.poll_normal_interval;
+            var nextWaitTime = service.interval || CONF.poll_default_interval
 
-            if ( service.last_code == 200 ) {
-                logGood( service );
+            if (service.last_code === 200) {
+                logGood(service);
 
                 service.fails = 0;
             }
             else {
                 service.fails += 1;
 
-                logFailure( service );
+                logFailure(service);
 
-                sendServiceFailureReports( service );
+                sendServiceFailureReports(service);
 
                 if (service.fails > 2) {
-                    nextWaitTime = service.fails * CONF.poll_normal_interval;
+                    nextWaitTime = service.fails * CONF.poll_default_interval;
                 }
                 else {
                     nextWaitTime = service.fails * CONF.poll_fail_repeat_delay;
                 }
             }
 
-            return cb( null, nextWaitTime );
+            return callback(null, nextWaitTime);
         }
 
-    ], function scheduleNextRun( err, next_wait_time ) {
-        if ( err ) {
-            util.log( "Error while processing service " + service.name + ": " + err );
-            next_wait_time = CONF.poll_normal_interval;
+    ],
+
+    function scheduleNextRun(err, next_wait_time) {
+        if (err) {
+            util.log("Error while processing service " + service.name + ": " + err);
+            next_wait_time = CONF.poll_default_interval;
         }
 
-        setTimeout(function() { serviceCheckThread(service) }, next_wait_time );
-    } );
+        setTimeout(function() { serviceCheckThread(service) }, next_wait_time);
+    });
 }
 
-function determineRequestTimeoutFromFailures( service ) {
+function determineRequestTimeoutFromFailures(service) {
     var queryTimeout = service.short_timeout || CONF.short_timeout
     if (service.fails >= 1) queryTimeout = service.long_timeout || CONF.long_timeout
     if (service.fails >= 2) queryTimeout = service.patient_timeout || CONF.patient_timeout
-
     return queryTimeout;
 }
 
 
-function sendServiceFailureReports( service ) {
+function sendServiceFailureReports(service) {
     if (service.fails > 1) {
         spamPeopleWithEmail(service);
     }
@@ -155,7 +155,7 @@ function sendServiceFailureReports( service ) {
 /* * * ADMINISTRATOR NOTIFICATION * * * */
 
 function logGood(service) {
-    if ( service.fails > 0 ) {
+    if (service.fails > 0) {
         util.log(util.format(
             'Service is good after fail #%s: %s (%s ms)',
             service.fails, service.name, service.last_duration
@@ -176,7 +176,7 @@ function logFailure(service) {
     ))
 }
 
-function logTimeout(service, start_time, error, response, body ) {
+function logTimeout(service, start_time, error, response) {
     var last_duration = new Date().getTime() - start_time;
     var returned = error ? error.code : response.statusCode;
 
@@ -187,25 +187,26 @@ function logTimeout(service, start_time, error, response, body ) {
 }
 
 function spamPeopleWithEmail(service) {
-    var subject = 'ALERT: ' + service.name
+    var subject = "ALERT: %s"
 
-    var message = util.format(
-"Dear reader,\n\
-\n\
-It should come to Your attention, that the service called %s has some\n\
-issues. More specifically, error code %s was reported. The\n\
-service may be queried at the following address:\n\
-\n\
-%s\n\
-\n\
-Yours faithfully,\n\
-Nag process at %s\n", service.name, service.last_code, service.url, hostname)
+    var message = [
+        "Dear reader,",
+        "",
+        "It should come to Your attention, that the service called %s has",
+        "some issues. More specifically, error code %s was reported. The",
+        "service may be queried at the following address:",
+        "",
+        "%s",
+        "",
+        "Yours faithfully,",
+        "Nag process at %s"
+    ].join('\n')
 
     var mail = {
         from:    CONF.mail_sender,
         to:      CONF.mail_recipients,
-        subject: subject,
-        text:    message,
+        subject: util.format(subject, service.name),
+        text:    util.format(message, service.name, service.last_code, service.url, hostname)
     }
 
     var errHandler = function errHandler(err) {
@@ -220,10 +221,8 @@ Nag process at %s\n", service.name, service.last_code, service.url, hostname)
 }
 
 function makePhonesBeep(service) {
-    if (!CONF.sms_recipients instanceof Array) {
-        util.log("Unable to send sms, please check configuration")
-        return
-    }
+    if (!CONF.hasOwnProperty('sms_recipients')) return
+    if (!CONF.sms_recipients instanceof Array)  return
 
     var twilio = require('twilio')
     var twilioclient = new twilio.RestClient(CONF.twilio_account_sid, CONF.twilio_auth_token)
@@ -240,7 +239,7 @@ function makePhonesBeep(service) {
             body: message
         }
 
-        var callback = function(err, msg) {
+        var callback = function(err) {
             if (err) util.log("Sending text message failed")
             else     util.log("SMS sent to: " + sms.to)
         }
