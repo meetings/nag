@@ -1,9 +1,9 @@
 #!/bin/bash
-# stage1.sh, 2013-11-22 Tuomas Starck / Meetin.gs
+# githupdate.sh, 2013-12-09 / Meetin.gs
 #
-# Autodeployment script to fetch and update service git repository.
-# This script is, of course, run before new version is available,
-# thus any new feature is not available.
+# Autodeployment script to fetch and update git repository together
+# with all submodules. This script is, of course, run before new
+# version is available, thus any new feature is not available.
 
 set -u
 
@@ -15,11 +15,11 @@ _git_checkout() {
     git show-ref -q --verify refs/heads/$RANK; EXISTS_LOCAL=$?
 
     if [ $EXISTS_LOCAL -eq 0 ]; then
-        echo " *** upgrade: Checking out $RANK"
+        echo "[git] Checking out $RANK"
         git checkout $RANK
         git merge --ff-only refs/remotes/origin/$RANK
     else
-        echo " *** upgrade: Creating local tracking branch for $RANK"
+        echo "[git] Creating local tracking branch for $RANK"
         git checkout -b $RANK origin/$RANK
     fi
 }
@@ -43,16 +43,17 @@ git_upgrade() {
     if [ $EXISTS_REMOTE -eq 0 ]; then
         _git_checkout
     else
-        echo " *** upgrade: No remote branch $RANK, keeping master"
+        echo "[git] No remote branch $RANK, keeping master"
     fi
 
     CURRENT=$(git rev-parse HEAD)
     echo " --- $PREVIOUS"
     echo " +++ $CURRENT"
 
-    # Compare previous and current versions. This will
-    # set the return value of the function to indicate,
-    # if version has changed.
+    # Compare previous and current versions. This will set the return
+    # value of the function to indicate, if version has changed.
+    # Submodules are not checked and any changes in them will not
+    # trigger upgrade.
     #
     [ "$PREVIOUS" == "$CURRENT" ]
 }

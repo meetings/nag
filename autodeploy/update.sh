@@ -1,32 +1,16 @@
 #!/bin/bash
-# update.sh, 2013-11-22 Tuomas Starck / Meetin.gs
-#
-# Autodeployment (version 2) update hook for
-# generic Node.js service upgrading.
 
-set -u
+. $DEPLOYDIR/githupdate.sh
 
-. $DEPLOYDIR/stage1.sh
-
-git_upgrade && {
-    echo " *** update: Version has not changed, exiting"
+git_upgrade && [ "$FORCE" != "yes" ] && {
+    echo Version has not changed, exiting
     exit 0
 }
 
-. $DEPLOYDIR/stage2.sh
+npm update
 
-acquire_lock && {
-    echo " *** update: Lock acquired, trying to update"
-    npm update 2> /dev/null
+install -m 0644 $DEPLOYDIR/$INTENT.conf /etc/init
 
-    echo " *** update: Installing service configuration"
-    install -m 0644 -p $DEPLOYDIR/$INTENT.conf /etc/init/
+service $INTENT restart
 
-    echo " *** update: Updating version"
-    git rev-parse HEAD | tee $VERSIONFILE
-
-    echo " *** update: Restarting service"
-    service $INTENT restart
-
-    release_lock
-}
+echo Githupdate done
