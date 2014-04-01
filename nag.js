@@ -146,8 +146,12 @@ function sendServiceFailureReports(service) {
         spamPeopleWithEmail(service);
     }
 
+    if (service.fails == 2) {
+        doExperimentalAndroidNotify(service);
+    }
+
     if (service.fails > 2) {
-        makePhonesBeep(service);
+        sendTextMessage(service);
     }
 }
 
@@ -220,7 +224,30 @@ function spamPeopleWithEmail(service) {
     util.log("Mail sent to: " + mail.to)
 }
 
-function makePhonesBeep(service) {
+function doExperimentalAndroidNotify(service) {
+    if (!CONF.hasOwnProperty('nma_apikey')) return
+    if (!CONF.nma_apikey) return
+
+    var id = Date.now()
+
+    var notify_uri = 'https://www.notifymyandroid.com/publicapi/notify' +
+                     '?apikey=%s&application=%s&event=%s&description=%s%3A%20%s'
+
+    var notification = {
+        uri:     util.format(notify_uri, CONF.nma_apikey, hostname,
+                 service.name, service.last_code, service.url),
+        method:  'POST',
+        timeout: 10000
+    }
+
+    util.log(util.format('Sending Android notification (%s)', id))
+
+    request(notification, function (error, response, body) {
+        util.log(util.format('Android notification sent (%s)', id))
+    });
+}
+
+function sendTextMessage(service) {
     if (!CONF.hasOwnProperty('sms_recipients')) return
     if (!CONF.sms_recipients instanceof Array)  return
 
