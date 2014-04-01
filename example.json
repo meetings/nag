@@ -29,6 +29,8 @@
     "ssl":      ""
 },
 
+"nma_apikey": "comma separated list of NMA api keys (or leave empty)",
+
 "sms_recipients": [
     "An array of phone numbers.",
     "",
