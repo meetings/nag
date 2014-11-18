@@ -1,12 +1,12 @@
 {
   "name": "nag",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Nag tool",
   "dependencies": {
-    "emailjs": "0.3.4",
-    "request": "2.27.0",
-    "async": "0.2.9",
-    "twilio": "1.2.0"
+    "emailjs": "~ 0.3.12",
+    "request": "~ 2.48.0",
+    "async": "~ 0.9.0",
+    "twilio": "~ 1.8.0"
   },
   "bin": "./nag.js",
   "scripts": {
