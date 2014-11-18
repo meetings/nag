@@ -170,13 +170,21 @@ function logFailure(service) {
 }
 
 function logTimeout(service, start_time, error, response) {
-  var last_duration = new Date().getTime() - start_time
+  var duration = new Date().getTime() - start_time
   var returned = error ? error.code : response.statusCode
 
-  util.puts(util.format(
-    'Timed out service returned: %s (%s) in %s ms',
-    service.name, returned, last_duration
-  ))
+  if (returned === 'ETIMEDOUT') {
+    util.puts(util.format(
+      'Service never replied: %s (after %s ms)',
+      service.name, duration
+    ))
+  }
+  else {
+    util.puts(util.format(
+      'Timed out service replied: %s (%s after %s ms)',
+      service.name, returned, duration
+    ))
+  }
 }
 
 function spamPeopleWithEmail(srv) {
